@@ -215,10 +215,4 @@ proof-of-concept/data/nhd/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb/a00
 proof-of-concept/data/nhd/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb/a0000003e.ToCom.atx
 proof-of-concept/data/nhd/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb/gdb
 proof-of-concept/data/nhd/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb/timestamps
-proof-of-concept/data/staged/block_groups.gpkg
-proof-of-concept/data/staged/blocks.gpkg
-proof-of-concept/data/staged/catchments.gpkg
-proof-of-concept/data/staged/counties.gpkg
-proof-of-concept/data/staged/tracts.gpkg
-proof-of-concept/proof-of-concept.Rmd
-proof-of-concept/proof-of-concept.Rproj
+

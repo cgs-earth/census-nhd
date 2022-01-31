@@ -1,0 +1,89 @@
+---
+title: "Census-NHD Proof-of-concept"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(sf)
+library(tidycensus)
+library(tigris)
+library(nhdplusTools)
+library(mapview)
+census_api_key("b25f8b1b7bf10561c9cbc3a20a4d2572677f1f05")
+options(tigris_use_cache = TRUE)
+```
+
+## Download NHD Data
+
+Here, we download NHDPlusV2.1, extract the Catchment polygons, and clip to the set of catchments that intersect HUC4 0303 (Cape Fear)
+
+```{r nhd, results="asis"}
+hu04 <- sf::read_sf("https://geoconnex.us/ref/hu04/0303") %>% st_transform(4326)
+# download_nhdplusv2(outdir="./data/nhd/",
+#                       url = paste0("https://s3.amazonaws.com/edap-nhdplus/NHDPlusV21/",
+#     "Data/NationalData/NHDPlusV21_NationalData_Seamless", "_Geodatabase_Lower48_07.7z"),
+#   progress = TRUE
+# )
+# 
+# 
+# path <- "./data/nhd/NHDPlusV21_National_Seamless_Flattened_Lower48.gdb"
+# cat<- sf::st_read(path, layer = "Catchment") %>% st_transform(4326)
+# 
+sf_use_s2(FALSE)
+# cat <- cat[hu04,]
+# 
+# write_sf(cat,"./data/staged/catchments.gpkg")
+
+cat <- read_sf("./data/staged/catchments.gpkg")
+
+mapview(cat,alpha.regions=0, color="green") + mapview(hu04) 
+```
+
+## Download Census data
+
+Here, we download census blocks, block groups, tracts, and counties from the Census TIGER/LINE files. 
+
+```{r census, results="asis"}
+#  counties <- counties(state = 37) %>% st_transform(4326)
+#  blocks <- blocks(state = 37, year = 2020) %>% st_transform(4326)
+#  tracts <- tracts(state = 37, year = 2020) %>% st_transform(4326)
+#  block_groups <- block_groups(state = 37, year = 2020) %>% st_transform(4326)
+#  tracts_0303 <- tracts[hu04,]
+#  blocks_0303 <- blocks[hu04,]
+#  counties_0303 <- counties[hu04,]
+#  block_groups_0303 <- block_groups[hu04,]
+# # 
+#  write_sf(blocks_0303,"./data/staged/blocks.gpkg")
+#  write_sf(counties_0303,"./data/staged/counties.gpkg")
+#  write_sf(block_groups_0303,"./data/staged/block_groups.gpkg")
+#  write_sf(tracts_0303,"./data/staged/tracts.gpkg")
+
+blocks <- read_sf("./data/staged/blocks.gpkg")
+block_groups <- read_sf("./data/staged/block_groups.gpkg")
+tracts <- read_sf("./data/staged/tracts.gpkg")
+counties <- read_sf("./data/staged/counties.gpkg")
+
+mapview(counties, col.regions="red", alpha.regions=0.2) + 
+  mapview(tracts, col.regions="orange", alpha.regions=0.2) + 
+  mapview(block_groups, col.regions="green", alpha.regions=0.2) + 
+  mapview(blocks, col.regions="blue", alpha.regions=0.2)
+
+```
+
+We attempt to intersect blocks and catchments. First we ensure we are using valid spherical geometries, and calculate the areas of both.
+
+```{r intersection, echo=FALSE}
+sf_use_s2(FALSE)
+cat <- st_make_valid(cat)
+blocks <- st_make_valid(blocks)
+cat$area_catchment_m2 <- st_area(cat)
+blocks$area_block_m2 <- st_area(blocks)
+cross <- st_intersection(cat,blocks)
+cross$area_cross_m2 <- st_area(cross)
+cross$prop_block_in_catchment <- as.numeric(cross$area_cross_m2/cross$area_block_m2)
+cross$prop_catchment_in_block<- as.numeric(cross$area_cross_m2/cross$area_catchment_m2)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
