@@ -1,6 +1,17 @@
 ---
 title: "Census-NHD Proof-of-concept"
-output: html_document
+author: 
+- Kyle Onda^[konda@lincolninst.edu]
+date: "`r Sys.Date()`"
+output:   
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    code_folding: hide
+    fig_width: 8
+    fig_height: 8
+    theme: readable
 ---
 
 ```{r setup, include=FALSE}
@@ -17,7 +28,7 @@ options(tigris_use_cache = TRUE)
 
 ## Download NHD Data
 
-Here, we download NHDPlusV2.1, extract the Catchment polygons, and clip to the set of catchments that intersect HUC4 0303 (Cape Fear)
+Here, we download NHDPlusV2.1, extract the Catchment polygons, and clip to the set of catchments that intersect HUC4 0303 (Cape Fear). For display purposes we just show the Catchments in Orange County, NC, overlayed with the intersecting HUC12 to show the relative size disparity.
 
 ```{r nhd, results="asis"}
 hu04 <- sf::read_sf("https://geoconnex.us/ref/hu04/0303") %>% st_transform(4326)
@@ -35,15 +46,19 @@ sf_use_s2(FALSE)
 # cat <- cat[hu04,]
 # 
 # write_sf(cat,"./data/staged/catchments.gpkg")
+huc12 <- sf::read_sf("./data/nhd/WbDHU12.shp") %>% st_transform(4326)
+huc12 <- huc12[hu04,]
 
 cat <- read_sf("./data/staged/catchments.gpkg")
-
-mapview(cat,alpha.regions=0, color="green") + mapview(hu04) 
+orange_county <- sf::read_sf("https://geoconnex.us/ref/counties/37135")
+catchments_orange <- cat[orange_county,]
+huc12 <- huc12[orange_county,]
+mapview(catchments_orange, alpha.regions=0, color="blue") +
+  mapview(huc12, alpha.regions=0, color="brown", col.regions="brown", lwd=2)
 ```
-
 ## Download Census data
 
-Here, we download census blocks, block groups, tracts, and counties from the Census TIGER/LINE files. 
+Here, we download census blocks, block groups, tracts, and counties from the Census TIGER/LINE files. For comparison purposes, we just show Catchments, Census Blocks, and HUC12s to show the utility doing this.
 
 ```{r census, results="asis"}
 #  counties <- counties(state = 37) %>% st_transform(4326)
@@ -65,16 +80,21 @@ block_groups <- read_sf("./data/staged/block_groups.gpkg")
 tracts <- read_sf("./data/staged/tracts.gpkg")
 counties <- read_sf("./data/staged/counties.gpkg")
 
-mapview(counties, col.regions="red", alpha.regions=0.2) + 
-  mapview(tracts, col.regions="orange", alpha.regions=0.2) + 
-  mapview(block_groups, col.regions="green", alpha.regions=0.2) + 
-  mapview(blocks, col.regions="blue", alpha.regions=0.2)
+blocks_orange <- blocks[orange_county,]
+
+#mapview(counties, col.regions="red", alpha.regions=0.2) + 
+#  mapview(tracts, col.regions="orange", alpha.regions=0.2) + 
+ # mapview(block_groups, col.regions="green", alpha.regions=0.2)# + 
+mapview(blocks_orange, col.regions="brown", alpha.regions=0.1) + 
+  mapview(catchments_orange, alpha.regions=0.2, color="blue")
 
 ```
 
-We attempt to intersect blocks and catchments. First we ensure we are using valid spherical geometries, and calculate the areas of both.
+## Intersection
 
-```{r intersection, echo=FALSE}
+We attempt to intersect blocks and catchments. First we ensure we are using valid spherical geometries, and calculate the areas of both. In the HUC4 0303, $127,069$ of these result from $50,379$ Census Blocks and $15,357$ NHDPlusV2 Catchments. The histogram below visualizes the distribution of Census 2020 Block/ NHDPlusV2 Catchment intersection polygons according to the proportion of the area of the Block that is in the intersection polygon. This shows why using an intersection method is important, and not using simplifications such as assigning Blocks to Catchments based on centroid-in-polygon type methods. While $44\%$ of blocks in this sample are completely or $>99\%$ within one NHD Catchment, $~32\%$ of blocks are between $20\%$ and $80\%$ overlapping with 1 or more NHD Catchments.
+
+```{r intersection, results="asis"}
 sf_use_s2(FALSE)
 cat <- st_make_valid(cat)
 blocks <- st_make_valid(blocks)
@@ -84,6 +104,10 @@ cross <- st_intersection(cat,blocks)
 cross$area_cross_m2 <- st_area(cross)
 cross$prop_block_in_catchment <- as.numeric(cross$area_cross_m2/cross$area_block_m2)
 cross$prop_catchment_in_block<- as.numeric(cross$area_cross_m2/cross$area_catchment_m2)
+
+hist(cross$prop_block_in_catchment, breaks=10)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Areal Weigting Scheme
+
+
