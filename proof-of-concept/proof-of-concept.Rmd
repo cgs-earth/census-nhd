@@ -16,14 +16,17 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 library(tidyverse)
 library(sf)
 library(tidycensus)
 library(tigris)
 library(nhdplusTools)
 library(mapview)
+library(leafsync)
 census_api_key("b25f8b1b7bf10561c9cbc3a20a4d2572677f1f05")
 options(tigris_use_cache = TRUE)
+vars_dec_2020<-load_variables(2020, "pl",cache = TRUE)
 ```
 
 ## Download NHD Data
@@ -150,14 +153,48 @@ Broadly, there are two types of census data variables made available at any give
 Since Census Blocks are the smallest spatial units for which census data is available, if estimates of census variables are to be made for areas that represent aggregates of *parts* of blocks, an assumption must be made as to how to distribute the measured variable among those parts. A reasonable, if imperfect, assumption is to assume that all populations that are 
 counted are dispersed evenly spatially throughout the block. This results in different calculations for aggregating Census Block counts vs summary statistics across 1 or more Census Block parts. 
 
-Consider the simplest variable available: Total Population (residing in a Census Block). If one were to divide a Census Block into two parts each with $1/2$ the area of Block, this assumption would imply that each part would have $1/2$ of the Total Population. 
+### Counts
+
+Consider the simplest variable available: Total Population (residing in a Census Block). If one were to divide a Census Block into two parts each with $1/2$ the area of Block, this assumption would imply that each part would have $1/2$ of the Total Population. In the figure below, compare the resulting estimated population densities for Blocks and Catchments (normalizing estimated population counts by the areas of each respective polygon)
 
 ```{r census_data}
+bl_pop_data <- get_decennial(geography = "block",
+                              state = "37",
+                              county = "135",
+                              variables = c("H1_001N", "H1_002N", "P1_001N", "P1_004N"),
+                              output = "wide",
+                              year = 2020
+                             )
 
+b <- left_join(cross, bl_pop_data, by = c("GEOID20" = "GEOID"))
+cat_pop <- b %>% group_by(NHDPlusID) %>% summarise(pop = sum(P1_001N * prop_block_in_catchment))
+blocks_pop <- b %>% group_by(GEOID20) %>% summarise(pop = mean(P1_001N))
+
+cat_pop$popdense = 10^6 * cat_pop$pop/st_area(cat_pop)
+blocks_pop$popdense =  10^6 * blocks_pop$pop/st_area(blocks_pop)
+blocks_pop2 <- blocks_pop[which(as.numeric(blocks_pop$popdense) < 7350),]
+
+map2 <- sync(mapview(blocks_pop2,
+                     zcol = "popdense",
+                     layer.name = "Pop. Density by Block") +
+             mapview(cat_pop, 
+                     layer.name = "Catchment Outlines",
+                     color = "blue",
+                     alpha.regions = 0,
+                     col.regions = "blue",
+                     lwd =1)   ,
+             mapview(cat_pop,
+                     zcol = "popdense",
+                     layer.name = "Pop. Density Est. by Catchment")
+             )
+
+map2
 ```
 
 
-## Areal Weigting Scheme
+## The Vision: Summarizing data for arbitrary basins
+
+We can now
 
 The key to calculating
 
