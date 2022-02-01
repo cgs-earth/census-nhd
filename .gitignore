@@ -224,3 +224,9 @@ proof-of-concept/data/nhd/WBDHU12.sbx
 proof-of-concept/data/nhd/WBDHU12.shp
 proof-of-concept/data/nhd/WBDHU12.shp.xml
 proof-of-concept/data/nhd/WBDHU12.shx
+*.freelist
+*.gdbindexes
+*.gdbtable
+*.gdbtablx
+*.atx
+*.spx
