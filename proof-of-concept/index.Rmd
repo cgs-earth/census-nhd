@@ -163,12 +163,12 @@ Broadly, there are two types of census data variables made available at any give
 * counts (e.g. of people/households of various ages/genders/races/income brackets)
 * summary statistics of distributions (e.g. median household income)
 
-Since Census Blocks are the smallest spatial units for which census data is available, if estimates of census variables are to be made for areas that represent aggregates of *parts* of blocks, an assumption must be made as to how to distribute the measured variable among those parts. A reasonable, if imperfect, assumption is to assume that all populations that are 
+Since Census Blocks are the smallest spatial units for which census data is available, if estimates of census variables are to be made for areas that represent aggregates of *parts* of blocks, an assumption must be made as to how to distribute the measured variable among those parts. A feasible, if imperfect, assumption is to assume that all populations that are 
 counted are dispersed evenly spatially throughout the block. This results in different calculations for aggregating Census Block counts vs summary statistics across 1 or more Census Block parts. 
 
 ### Counts
 
-Consider the simplest variable available: Total Population (residing in a Census Block). If one were to divide a Census Block $i$ into two parts each with $1/2$ the area of Block, this assumption would imply that each part would have $1/2$ of the Total Population $Pop_{i}$. To apply this assumption to aggregate such count estimates as Population $Pop_{i}$ and Household $HH_{i}$ totals across intersection polygons, each comprising the part of Census Block $i$ within Catchment $j$, we take the weighted sum of Census Block Population values, where the weight applied to each intersection polygon are 
+Consider the simplest variable available: Total Population (residing in a Census Block). If one were to divide a Census Block $i$ into two parts each with $1/2$ the area of the Block, this assumption would imply that each part would have $1/2$ of the Total Population $Pop_{i}$. To apply this assumption to aggregate such count estimates as Population $Pop_{i}$ and Household $HH_{i}$ totals across intersection polygons, each comprising the part of Census Block $i$ within Catchment $j$, we take the weighted sum of Census Block Population values, where the weight applied to each intersection polygon are 
 
 
 $\LARGE W_{ij} = \LARGE\frac{AreaIntersection_{ij}}{AreaCensusBlock_{i}}$
