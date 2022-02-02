@@ -9,7 +9,7 @@ output:
     toc_float: true
     toc_depth: 5
     code_folding: hide
-    fig_width: 12
+    fig_width: 9
     fig_height: 8
     theme: readable
 ---
@@ -28,10 +28,23 @@ census_api_key("b25f8b1b7bf10561c9cbc3a20a4d2572677f1f05")
 options(tigris_use_cache = TRUE)
 vars_dec_2020<-load_variables(2020, "pl",cache = TRUE)
 ```
+## Proposal
+
+There are many use cases within social and environmental science and policy for being able to create summaries of sociodemographic for hydrologic areas in a consistent manner, which requires conflating Census geographies with the hydrologic landscape (most notably represented in digital form by the NHD products.). For policy in particular, summarization methods and any resulting data products need to be open, well-documented, and agreed upon by key stakeholders.
+
+1. Prioritizing small basins for investments and subsidies for relevant wastewater control based on demographics and known water quality/ impairment information
+1. Prioritizing basins for monitoring/surveillance infrastructure or activity based on demographics and known water quality, scarcity, and/or flooding risks at fine resolution.
+1. Estimating water availability in rural areas net modeled withdrawals. 
+1. Studying relationships between demographics, land use/ land cover, runoff/downstream water quality and economic activity at the watershed scale at higher resolution than HUC12.
+
+
+
+
+## The Vision: Summarizing data for arbitrary basins
 
 ## Download NHD Data
 
-Here, we download NHDPlusV2.1, extract the Catchment polygons, and clip to the set of catchments that intersect HUC4 0303 (Cape Fear). For display purposes we just show the Catchments in Orange County, NC, overlayed with the intersecting HUC12 to show the relative size disparity.
+Here, we download NHDPlusV2.1, extract the Catchment polygons, and clip to the set of catchments that intersect Orange County, NC. 
 
 ```{r nhd, results="asis"}
 hu04 <- sf::read_sf("https://geoconnex.us/ref/hu04/0303") %>% st_transform(4326)
@@ -74,11 +87,11 @@ huc12 <- read_sf("./data/staged/huc12.gpkg")
 cathr_orange <- read_sf("./data/staged/cathr_orange.gpkg")
 flowhr <- read_sf("./data/staged/flowhr.gpkg")
 
-map <- mapview(cathr_orange, alpha.regions=0, color="darkgreen", layer.name="Catchments", col.regions="darkgreen") +
-  mapview(huc12, alpha.regions=0, color="brown", col.regions="brown", lwd=2,layer.name="HUC12") + 
+map <- mapview(cathr_orange, alpha.regions=0, color="darkgreen", layer.name="Catchments", col.regions="darkgreen", lwd=2) +
+  mapview(huc12, alpha.regions=0, color="brown", col.regions="brown", lwd=3,layer.name="HUC12") + 
   mapview(flowhr, color="blue", layer.name="Flowlines")
 
-map
+
 ```
 ## Download Census data
 
@@ -110,7 +123,7 @@ blocks_orange <- blocks[orange_county,]
 #  mapview(tracts, col.regions="orange", alpha.regions=0.2) + 
  # mapview(block_groups, col.regions="green", alpha.regions=0.2)# + 
 
- map + mapview(blocks_orange, alpha.regions=0, color="black", col.regions="black", lwd=0.3)
+ map + mapview(blocks_orange, alpha.regions=0, color="black", col.regions="black", lwd=0.3, zcol="BLOCKCE20")
 
 ```
 
@@ -155,28 +168,96 @@ counted are dispersed evenly spatially throughout the block. This results in dif
 
 ### Counts
 
-Consider the simplest variable available: Total Population (residing in a Census Block). If one were to divide a Census Block into two parts each with $1/2$ the area of Block, this assumption would imply that each part would have $1/2$ of the Total Population. In the figure below, compare the resulting estimated population densities for Blocks and Catchments (normalizing estimated population counts by the areas of each respective polygon)
+Consider the simplest variable available: Total Population (residing in a Census Block). If one were to divide a Census Block $i$ into two parts each with $1/2$ the area of Block, this assumption would imply that each part would have $1/2$ of the Total Population $Pop_{i}$. To apply this assumption to aggregate such count estimates as Population $Pop_{i}$ and Household $HH_{i}$ totals across intersection polygons, each comprising the part of Census Block $i$ within Catchment $j$, we take the weighted sum of Census Block Population values, where the weight applied to each intersection polygon are 
+
+
+$\LARGE W_{ij} = \LARGE\frac{AreaIntersection_{ij}}{AreaCensusBlock_{i}}$
+
+
+The estimate for the the population and household counts within Catchment $j$ are then
+
+
+$\LARGE Pop_{j} = \LARGE \sum_{1}^{ij}W_{ij}*Pop_{i}$
+
+
+
+$\LARGE HH_{j} = \LARGE \sum_{1}^{ij} W_{ij} *{HH}_{i}$
+
+
+### Other estimates
+
+For non-count summary statistics, the procedure is similar, but instead of weighting each intersection polygon by its area proportion of the contributing block, we take the weighted average of the summary statistic, with the weight being the area proportion ($W_{ij}$ from above) times the size of the relevant population, and the denominator being the the total of the estimated relevant population. For example, for the statistic "Median Household Income", to estimate $MHI_{j}$ within Catchment $j$, we would first calculate $HH_{j}$ as above, and then:
+
+
+$\LARGE MHI_{j} = \LARGE \frac{\sum_{1}^{ij}W_{ij}*HH_{i}*MHI_{i}}{HH_j}$
+
+
+In the figure below, compare the resulting estimated populations and proportions of the population that are Black for Blocks and Catchments.
 
 ```{r census_data}
 bl_pop_data <- get_decennial(geography = "block",
-                              state = "37",
-                              county = "135",
-                              variables = c("H1_001N", "H1_002N", "P1_001N", "P1_004N"),
-                              output = "wide",
-                              year = 2020
-                             )
-
+                               state = "37",
+                               county = "135",
+                               variables = c("H1_001N", "H1_002N", "P1_001N", "P1_004N"),
+                               output = "wide",
+                               year = 2020
+                              )
 b <- left_join(cross, bl_pop_data, by = c("GEOID20" = "GEOID"))
-cat_pop <- b %>% group_by(NHDPlusID) %>% summarise(pop = sum(P1_001N * prop_block_in_catchment))
-blocks_pop <- b %>% group_by(GEOID20) %>% summarise(pop = mean(P1_001N))
+# b$pop <- b$P1_001N * prop_block_in_catchment
+# 
+# cat_pop <- b %>% group_by(NHDPlusID) %>% 
+#   summarise(pop = sum(P1_001N * prop_block_in_catchment),
+#             pop_black = sum(P1_004N * prop_block_in_catchment)) %>% 
+#   mutate(prop_black = pop_black/pop)
+# 
+# blocks_pop <- b %>% group_by(GEOID20) %>% 
+#   summarise(pop = mean(P1_001N),
+#             pop_black = mean(P1_004N)) %>% 
+#   mutate(prop_black = pop_black/pop)
+# 
+# cat_pop$popdense = 10^6 * cat_pop$pop/st_area(cat_pop)
+# blocks_pop$popdense =  10^6 * blocks_pop$pop/st_area(blocks_pop)
+# 
+# #Censoring just to make the color legends even
+# blocks_pop$popdense[which(as.numeric(blocks_pop$popdense) > 7350)] <- 7350 
+# blocks_pop$prop_black[which(as.numeric(blocks_pop$prop_black) > 0.783)] <- 0.783
+# 
+# write_sf(blocks_pop,"./data/staged/blocks_pop.gpkg")
+# write_sf(cat_pop,"./data/staged/cat_pop.gpkg")
 
-cat_pop$popdense = 10^6 * cat_pop$pop/st_area(cat_pop)
-blocks_pop$popdense =  10^6 * blocks_pop$pop/st_area(blocks_pop)
-blocks_pop2 <- blocks_pop[which(as.numeric(blocks_pop$popdense) < 7350),]
+blocks_pop <- read_sf("./data/staged/blocks_pop.gpkg")
+cat_pop <- read_sf("./data/staged/cat_pop.gpkg")
+# map2 <- sync(mapview(blocks_pop,
+#                      zcol = "pop",
+#                      layer.name = "Pop. by Block") +
+#              mapview(cat_pop, 
+#                      layer.name = "Catchment Outlines",
+#                      color = "blue",
+#                      alpha.regions = 0,
+#                      col.regions = "blue",
+#                      lwd =1)   ,
+#              mapview(cat_pop,
+#                      zcol = "pop",
+#                      layer.name = "Pop.Est. by Catchment")
+#              )
+# 
+# map3 <- sync(mapview(blocks_pop,
+#                      zcol = "prop_black",
+#                      layer.name = "Prop Black by Block") +
+#              mapview(cat_pop, 
+#                      layer.name = "Catchment Outlines",
+#                      color = "blue",
+#                      alpha.regions = 0,
+#                      col.regions = "blue",
+#                      lwd =1)   ,
+#              mapview(cat_pop,
+#                      zcol = "prop_black",
+#                      layer.name = "Prop. Black Est. by Catchment")
+#              )
 
-map2 <- sync(mapview(blocks_pop2,
-                     zcol = "popdense",
-                     layer.name = "Pop. Density by Block") +
+map4 <- sync(mapview(blocks_pop,
+                     zcol = "pop",
+                     layer.name = "Pop. by Block") +
              mapview(cat_pop, 
                      layer.name = "Catchment Outlines",
                      color = "blue",
@@ -184,17 +265,80 @@ map2 <- sync(mapview(blocks_pop2,
                      col.regions = "blue",
                      lwd =1)   ,
              mapview(cat_pop,
-                     zcol = "popdense",
-                     layer.name = "Pop. Density Est. by Catchment")
+                     zcol = "pop",
+                     layer.name = "Pop.Est. by Catchment"),
+             mapview(blocks_pop,
+                     zcol = "prop_black",
+                     layer.name = "Prop Black by Block") +
+             mapview(cat_pop, 
+                     layer.name = "Catchment Outlines",
+                     color = "blue",
+                     alpha.regions = 0,
+                     col.regions = "blue",
+                     lwd =1)   ,
+             mapview(cat_pop,
+                     zcol = "prop_black",
+                     layer.name = "Prop. Black Est. by Catchment")
              )
 
-map2
+map5 <- sync(mapview(blocks_pop,
+                     zcol = "pop",
+                     layer.name = "Pop. by Block") +
+             mapview(cat_pop, 
+                     layer.name = "Catchment Outlines",
+                     color = "blue",
+                     alpha.regions = 0,
+                     col.regions = "blue",
+                     lwd =1)   ,
+             mapview(cat_pop,
+                     zcol = "pop",
+                     layer.name = "Pop.Est. by Catchment"),
+             mapview(blocks_pop,
+                     zcol = "prop_black",
+                     layer.name = "Prop Black by Block") +
+             mapview(cat_pop, 
+                     layer.name = "Catchment Outlines",
+                     color = "blue",
+                     alpha.regions = 0,
+                     col.regions = "blue",
+                     lwd =1)   ,
+             mapview(cat_pop,
+                     zcol = "prop_black",
+                     layer.name = "Prop. Black Est. by Catchment")
+             )
+
+map4
 ```
 
 
-## The Vision: Summarizing data for arbitrary basins
+## NLDI Indexing
 
-We can now
+We can preview what the NLDI integration might look like. Below, we query the NLDI for the upstream flowlines, including tributaries, and the entire basin, find the set of Census Block/ Catchment intersection polygons, and display the proportion of each block in each catchment, representing $W_{ij}$.
 
-The key to calculating
+```{r}
+#start <-jsonlite::fromJSON("https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/position?f=json&coords=POINT(-79.2368 36.164)")
 
+
+comid <- 8890058
+feature <- list("featureSource" = "comid", featureID = comid)
+start <- st_sfc(st_point(x=c(-79.23773, 36.15991), dim = "XY"))
+ut_flowlines <- navigate_nldi(nldi_feature = feature,
+              mode = "upstreamTributaries")$UT %>%
+  st_geometry()
+
+nldi_basin <- get_nldi_basin(feature)
+
+c <- st_intersection(b,nldi_basin)
+
+mapview(huc12[which(huc12$huc12 == "030300020405"),], alpha.regions=0, color="brown", col.regions="brown", lwd=3,layer.name="HUC12") +
+  mapview(st_intersection(flowhr,nldi_basin),color="blue",lwd=2, layer.name = "nldi_flowlines") + 
+  mapview(nldi_basin, alpha.regions=0, color="blue", lwd=3, col.regions="blue") + 
+  mapview(start, col.regions="red") +
+  mapview(c,
+                     zcol = "prop_block_in_catchment",
+                     layer.name = "Prop. Block Pop </br> in Catchment (Weight)") + 
+  mapview(st_intersection(cathr_orange,nldi_basin), alpha.regions=0, lwd=2, layer.name="Catchments", col.regions="black")
+
+  
+```
+With Block/Catchment intersection polygons with weight attributes being indexed to the NLDI directly, Census summarization functions (integrating with Census API calls) can be built into NLDI clients.
