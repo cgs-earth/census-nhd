@@ -313,7 +313,7 @@ map4
 
 ## NLDI Indexing
 
-We can preview what the NLDI integration might look like. Below, we query the NLDI for the upstream flowlines, including tributaries, and the entire basin, find the set of Census Block/ Catchment intersection polygons, and display the proportion of each block in each catchment, representing $W_{ij}$.
+We can preview what the NLDI integration might look like. Below, we query the NLDI for the upstream flowlines, including tributaries, and the entire basin, find the set of Census Block/ Catchment intersection polygons, and display the proportion of each block in each catchment, representing $W_{ij}$. With Block/Catchment intersection polygons with weight attributes being indexed to the NLDI directly, Census summarization functions (integrating with Census API calls) can be built into NLDI clients.
 
 ```{r}
 #start <-jsonlite::fromJSON("https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/position?f=json&coords=POINT(-79.2368 36.164)")
@@ -341,4 +341,4 @@ mapview(huc12[which(huc12$huc12 == "030300020405"),], alpha.regions=0, color="br
 
   
 ```
-With Block/Catchment intersection polygons with weight attributes being indexed to the NLDI directly, Census summarization functions (integrating with Census API calls) can be built into NLDI clients.
+
